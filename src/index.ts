@@ -16,89 +16,11 @@ import {
   Signal, ISignal
 } from '@phosphor/signaling';
 
+import { ContentWidget } from './contentwidget';
+
+import { OutSignals, SignalRouter } from './routing';
+
 import '../style/index.css';
-
-// interface defining the possible signals a widget can emit
-interface OutSignals {
-  [key:string]: any;
-}
-
-// interface defining the possible signals a widget can listen for
-interface InSignals {
-  [key:string]: any;
-}
-
-// widgets with a background colour and ability to send and receive signals 
-class ContentWidget extends Widget {
-
-  // static function createNode returning an HTMLElement type
-  static createNode(): HTMLElement {
-    let node = document.createElement('div');
-    let content = document.createElement('div');
-    node.appendChild(content);
-    return node;
-  }
-
-  // ContentWidget constructor, takes a string argument 'name'
-  constructor(name: string) {
-    // call the superclass constructor with a new node argument
-    super({ node: ContentWidget.createNode() });
-    // what does this do?
-    this.setFlag(Widget.Flag.DisallowLayout);
-    // this class probably comes from imported css?
-    this.addClass('content');
-    this.addClass(name.toLowerCase());
-    this.title.label = name;
-    this.title.closable = true;
-    this.title.caption = `Long description for: ${name}`;
-
-    // add a click event listener on node div
-    // when the div is clicked, a signal is emitted
-    // with the name of the widget as an arg
-    let outWidgetClicked = this._outWidgetClicked;
-    this.node.addEventListener('click', function() {
-      outWidgetClicked.emit(name)
-    });
-  }
-
-  // getter for outbound signal to emit when the widget is clicked
-  get outWidgetClicked(): ISignal<this, string> {
-    return this._outWidgetClicked;
-  }
-
-  // the outbound signal to emit when the widget is clicked
-  private _outWidgetClicked = new Signal<this, string>(this);
-
-  // the action to take when an inbound WidgetClicked signal received 
-  inWidgetClicked(sender: Widget, value: string): void {
-    this.node.children[0].innerHTML = `The widget with name ${value} was clicked`; 
-  }
-
-  // object containing the available outbound signals
-  public out: OutSignals = {
-    widgetClicked: this.outWidgetClicked
-  };
-
-  // object containing possible actions to take on receipt of inbound signals
-  public in: InSignals = {
-    widgetClicked: this.inWidgetClicked
-  };
-  
-  // gets the input element (using a get accessor)
-  // returns an HTMLInputElement type
-  get inputNode(): HTMLInputElement {
-    // use a type assertion to tell the compiler an HTMLInputElement type
-    // is returned from getElementsByTagName 
-    return this.node.getElementsByTagName('input')[0] as HTMLInputElement;
-  }
-  
-  // returns null, takes a Message argument named 'msg'
-  protected onActivateRequest(msg: Message): void {
-    if (this.isAttached) {
-      this.inputNode.focus();
-    }
-  }
-}
 
 // the main function, returns null
 function main(): void {
@@ -126,31 +48,14 @@ function main(): void {
   // change the dock id
   dock.id = 'dock';
 
-  /* 
-   * now connect up our widgets
-   * this should be handled in a ConnectionRouter class or something...
-   */
-
-  // the widgets we want to connect
-  const widgets: ContentWidget[] = [r1, b1, g1, y1];
+  // connect up the widgets
+  const signalRouter = new SignalRouter();
+  signalRouter.register(r1);
+  signalRouter.register(b1);
+  signalRouter.register(g1);
+  signalRouter.register(y1);
   
-  for (let i = 0; i < widgets.length; i++) {
-    // get the out signals
-    const outSignals: OutSignals = widgets[i].out;
-
-    // loop over the out signals
-    for (let outSignalProp in outSignals) {
-      // loop over other widgets
-      for (let j = 0; j < widgets.length; j++) {
-        if (i != j) {
-          const inFunc = widgets[j].in[outSignalProp];
-	  if (inFunc) {
-            outSignals[outSignalProp].connect(inFunc, widgets[j]);
-	  }
-	}
-      }
-    }
-  }
+  signalRouter.setup();
 
   BoxPanel.setStretch(dock, 1);
 
